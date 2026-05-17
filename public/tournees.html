@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournées — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <div class="brand-icon">💧</div>
+        <div class="brand-text">
+          <span class="brand-name">Eau Thermale Avène</span>
+          <span class="brand-sub">Formation Platform</span>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="userName">Chargement...</div>
+          <div class="user-role" id="userRole">—</div>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()" title="Déconnexion">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">Tournées</div>
+        <div class="page-subtitle">Gestion des tournées et stocks</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Nouvelle Tournée</button>
+    </header>
+
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Liste des tournées</h3>
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Rechercher une région…" id="searchInput" oninput="filterTable()">
+            </div>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div id="tableContainer">
+            <div class="loader"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="tourneeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Nouvelle Tournée</h3>
+      <button class="modal-close" onclick="Modal.close('tourneeModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div class="form-group">
+        <label class="form-label">Région *</label>
+        <input type="text" id="fRegion" class="form-control" placeholder="ex: Tunis Nord">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date de début *</label>
+          <input type="date" id="fDateDebut" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date de fin *</label>
+          <input type="date" id="fDateFin" class="form-control">
+        </div>
+      </div>
+      <p class="text-muted text-sm mb-4" style="font-weight:600;color:var(--text);margin-top:8px;">📦 Stock initial des cadeaux</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cadeau Type 1</label>
+          <input type="number" id="sType1" class="form-control" value="50" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cadeau Type 2</label>
+          <input type="number" id="sType2" class="form-control" value="30" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cadeau Type 3</label>
+          <input type="number" id="sType3" class="form-control" value="10" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Super Lot</label>
+          <input type="number" id="sSuperlot" class="form-control" value="2" min="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('tourneeModal')">Annuler</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveTournee()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Edit Modal -->
+<div class="modal-overlay" id="stockModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">Modifier le stock actuel</h3>
+      <button class="modal-close" onclick="Modal.close('stockModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="stockEditId">
+      <p class="text-muted mb-4">Ajustez les quantités de stock disponibles pour cette tournée.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type 1</label>
+          <input type="number" id="stType1" class="form-control" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type 2</label>
+          <input type="number" id="stType2" class="form-control" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type 3</label>
+          <input type="number" id="stType3" class="form-control" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Super Lot</label>
+          <input type="number" id="stSuperlot" class="form-control" min="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('stockModal')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveStock()">💾 Mettre à jour</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let allTournees = [];
+
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  await loadTournees();
+}
+
+async function loadTournees() {
+  try {
+    allTournees = await API.get('/api/tournees') || [];
+    renderTable(allTournees);
+  } catch (err) {
+    Toast.error('Erreur: ' + err.message);
+  }
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🗺️</div>
+        <h4>Aucune tournée</h4>
+        <p>Créez votre première tournée pour commencer</p>
+      </div>`;
+    return;
+  }
+  document.getElementById('tableContainer').innerHTML = `
+    <div class="table-wrapper">
+      <table class="table" id="mainTable">
+        <thead>
+          <tr>
+            <th>Région</th><th>Date début</th><th>Date fin</th>
+            <th>Stock Type 1</th><th>Stock Type 2</th><th>Stock Type 3</th><th>Super Lot</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(t => {
+            const s = t.stock_actuel || {};
+            const ini = t.stock_initial || {};
+            return `
+              <tr>
+                <td><strong>${t.region}</strong></td>
+                <td>${formatDate(t.date_debut)}</td>
+                <td>${formatDate(t.date_fin)}</td>
+                <td>${stockBadge(s.type1, ini.type1)}</td>
+                <td>${stockBadge(s.type2, ini.type2)}</td>
+                <td>${stockBadge(s.type3, ini.type3)}</td>
+                <td>${stockBadge(s.superlot, ini.superlot)}</td>
+                <td>
+                  <div class="actions-bar">
+                    <button class="btn btn-sm btn-outline" onclick="editStock(${t.id})">📦 Stock</button>
+                    <button class="btn btn-sm btn-outline" onclick="editTournee(${t.id})">✏️</button>
+                    <button class="btn btn-sm btn-danger" data-admin-only onclick="deleteTournee(${t.id})">🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (!Auth.isAdmin()) {
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+  }
+}
+
+function stockBadge(cur, ini) {
+  cur = cur || 0; ini = ini || 0;
+  const pct = ini ? Math.round((cur/ini)*100) : 0;
+  const cls = pct === 0 ? 'badge-error' : pct < 30 ? 'badge-warning' : 'badge-success';
+  return `<span class="badge ${cls}">${cur} / ${ini}</span>`;
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderTable(allTournees.filter(t => t.region.toLowerCase().includes(q)));
+}
+
+function openCreateModal() {
+  document.getElementById('editId').value = '';
+  document.getElementById('modalTitle').textContent = 'Nouvelle Tournée';
+  document.getElementById('fRegion').value = '';
+  document.getElementById('fDateDebut').value = '';
+  document.getElementById('fDateFin').value = '';
+  document.getElementById('sType1').value = 50;
+  document.getElementById('sType2').value = 30;
+  document.getElementById('sType3').value = 10;
+  document.getElementById('sSuperlot').value = 2;
+  Modal.open('tourneeModal');
+}
+
+function editTournee(id) {
+  const t = allTournees.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('editId').value = t.id;
+  document.getElementById('modalTitle').textContent = 'Modifier la tournée';
+  document.getElementById('fRegion').value = t.region;
+  document.getElementById('fDateDebut').value = t.date_debut;
+  document.getElementById('fDateFin').value = t.date_fin;
+  const ini = t.stock_initial || {};
+  document.getElementById('sType1').value = ini.type1 || 0;
+  document.getElementById('sType2').value = ini.type2 || 0;
+  document.getElementById('sType3').value = ini.type3 || 0;
+  document.getElementById('sSuperlot').value = ini.superlot || 0;
+  Modal.open('tourneeModal');
+}
+
+async function saveTournee() {
+  const id = document.getElementById('editId').value;
+  const stock = {
+    type1: parseInt(document.getElementById('sType1').value),
+    type2: parseInt(document.getElementById('sType2').value),
+    type3: parseInt(document.getElementById('sType3').value),
+    superlot: parseInt(document.getElementById('sSuperlot').value),
+  };
+  const body = {
+    region: document.getElementById('fRegion').value.trim(),
+    date_debut: document.getElementById('fDateDebut').value,
+    date_fin: document.getElementById('fDateFin').value,
+    stock_initial: stock
+  };
+  if (!body.region || !body.date_debut || !body.date_fin) { Toast.warning('Tous les champs obligatoires sont requis'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  try {
+    if (id) {
+      await API.put(`/api/tournees/${id}`, body);
+      Toast.success('Tournée mise à jour');
+    } else {
+      await API.post('/api/tournees', body);
+      Toast.success('Tournée créée');
+    }
+    Modal.close('tourneeModal');
+    await loadTournees();
+  } catch (err) {
+    Toast.error(err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Enregistrer';
+  }
+}
+
+function editStock(id) {
+  const t = allTournees.find(x => x.id === id);
+  if (!t) return;
+  const s = t.stock_actuel || {};
+  document.getElementById('stockEditId').value = id;
+  document.getElementById('stType1').value = s.type1 || 0;
+  document.getElementById('stType2').value = s.type2 || 0;
+  document.getElementById('stType3').value = s.type3 || 0;
+  document.getElementById('stSuperlot').value = s.superlot || 0;
+  Modal.open('stockModal');
+}
+
+async function saveStock() {
+  const id = document.getElementById('stockEditId').value;
+  const stock_actuel = {
+    type1: parseInt(document.getElementById('stType1').value),
+    type2: parseInt(document.getElementById('stType2').value),
+    type3: parseInt(document.getElementById('stType3').value),
+    superlot: parseInt(document.getElementById('stSuperlot').value),
+  };
+  try {
+    await API.put(`/api/tournees/${id}`, { stock_actuel });
+    Toast.success('Stock mis à jour');
+    Modal.close('stockModal');
+    await loadTournees();
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+async function deleteTournee(id) {
+  confirmAction('Supprimer cette tournée ? Toutes les pharmacies associées seront également supprimées.', async () => {
+    try {
+      await API.delete(`/api/tournees/${id}`);
+      Toast.success('Tournée supprimée');
+      await loadTournees();
+    } catch (err) {
+      Toast.error(err.message);
+    }
+  });
+}
+
+loadPage();
+</script>
+</body>
+</html>

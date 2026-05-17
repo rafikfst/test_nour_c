@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agents — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-logo"><div class="brand-icon">💧</div><div class="brand-text"><span class="brand-name">Eau Thermale Avène</span><span class="brand-sub">Formation Platform</span></div></div></div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer"><div class="user-card"><div class="user-avatar" id="userAvatar">A</div><div class="user-info"><div class="user-name" id="userName">Chargement...</div><div class="user-role" id="userRole">—</div></div><button class="btn-logout" onclick="handleLogout()" title="Déconnexion">🚪</button></div></div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">Agents</div>
+        <div class="page-subtitle">Gestion des agents par pharmacie</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Nouvel Agent</button>
+    </header>
+
+    <div class="page-body">
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap" style="flex:2">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Rechercher un agent…" id="searchInput" oninput="filterTable()">
+            </div>
+            <select class="form-control" id="pharmacyFilter" onchange="filterTable()" style="max-width:220px;">
+              <option value="">Toutes les pharmacies</option>
+            </select>
+            <select class="form-control" id="statutFilter" onchange="filterTable()" style="max-width:180px;">
+              <option value="">Tous statuts</option>
+              <option value="Non Joué">Non Joué</option>
+              <option value="Perdu">Perdu</option>
+              <option value="Gagné">Gagné</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <div id="tableContainer"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="agentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Nouvel Agent</h3>
+      <button class="modal-close" onclick="Modal.close('agentModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div class="form-group">
+        <label class="form-label">Pharmacie *</label>
+        <select id="fPharmacy" class="form-control"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom complet *</label>
+        <input type="text" id="fNom" class="form-control" placeholder="Prénom Nom">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="fEmail" class="form-control" placeholder="agent@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone</label>
+          <input type="tel" id="fTel" class="form-control" placeholder="+216 00 000 000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Statut du jeu</label>
+        <select id="fStatut" class="form-control">
+          <option value="Non Joué">Non Joué</option>
+          <option value="Perdu">Perdu</option>
+          <option value="Gagné Type 1">Gagné Type 1</option>
+          <option value="Gagné Type 2">Gagné Type 2</option>
+          <option value="Gagné Type 3">Gagné Type 3</option>
+          <option value="Gagné Super Lot">Gagné Super Lot</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('agentModal')">Annuler</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveAgent()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let allData = [], pharmacies = [];
+
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  // Check for pre-filter
+  const params = new URLSearchParams(window.location.search);
+  pharmacies = await API.get('/api/pharmacies') || [];
+  populatePharmacySelect();
+  allData = await API.get('/api/agents') || [];
+  if (params.get('pharmacy_id')) {
+    document.getElementById('pharmacyFilter').value = params.get('pharmacy_id');
+  }
+  filterTable();
+}
+
+function populatePharmacySelect() {
+  const opts = pharmacies.map(p => `<option value="${p.id}">${p.nom}</option>`).join('');
+  document.getElementById('pharmacyFilter').innerHTML = '<option value="">Toutes les pharmacies</option>' + opts;
+  document.getElementById('fPharmacy').innerHTML = '<option value="">Sélectionner une pharmacie</option>' + opts;
+}
+
+function getStatutBadge(statut) {
+  if (!statut || statut === 'Non Joué') return '<span class="badge badge-muted">⏳ Non Joué</span>';
+  if (statut === 'Perdu') return '<span class="badge badge-error">❌ Perdu</span>';
+  if (statut.startsWith('Gagné')) return `<span class="badge badge-success">🏆 ${statut}</span>`;
+  return `<span class="badge badge-info">${statut}</span>`;
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const pid = document.getElementById('pharmacyFilter').value;
+  const statut = document.getElementById('statutFilter').value;
+  const filtered = allData.filter(a => {
+    const matchQ = !q || a.nom.toLowerCase().includes(q) || (a.email || '').toLowerCase().includes(q);
+    const matchP = !pid || String(a.pharmacy_id) === pid;
+    const matchS = !statut || (statut === 'Gagné' ? a.statut_jeu?.startsWith('Gagné') : a.statut_jeu === statut);
+    return matchQ && matchP && matchS;
+  });
+  renderTable(filtered);
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">👤</div><h4>Aucun agent</h4><p>Ajoutez des agents aux pharmacies</p></div>`;
+    return;
+  }
+  document.getElementById('tableContainer').innerHTML = `
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Nom</th><th>Pharmacie</th><th>Email</th><th>Téléphone</th><th>Statut Jeu</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${data.map(a => {
+            const pharm = pharmacies.find(p => p.id === a.pharmacy_id);
+            return `
+              <tr>
+                <td><strong>${a.nom}</strong></td>
+                <td>${pharm ? pharm.nom : '<span class="text-muted">—</span>'}</td>
+                <td>${a.email || '<span class="text-muted">—</span>'}</td>
+                <td>${a.telephone || '<span class="text-muted">—</span>'}</td>
+                <td>${getStatutBadge(a.statut_jeu)}</td>
+                <td>
+                  <div class="actions-bar">
+                    <a href="/game.html?agent_id=${a.id}" class="btn btn-sm btn-success">🎮 Jouer</a>
+                    <button class="btn btn-sm btn-outline" onclick="editItem(${a.id})">✏️</button>
+                    <button class="btn btn-sm btn-danger" data-admin-only onclick="deleteItem(${a.id})">🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (!Auth.isAdmin()) document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+}
+
+function openCreateModal() {
+  document.getElementById('editId').value = '';
+  document.getElementById('modalTitle').textContent = 'Nouvel Agent';
+  ['fNom','fEmail','fTel'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fPharmacy').value = '';
+  document.getElementById('fStatut').value = 'Non Joué';
+  Modal.open('agentModal');
+}
+
+function editItem(id) {
+  const a = allData.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('editId').value = a.id;
+  document.getElementById('modalTitle').textContent = 'Modifier l\'agent';
+  document.getElementById('fNom').value = a.nom;
+  document.getElementById('fEmail').value = a.email || '';
+  document.getElementById('fTel').value = a.telephone || '';
+  document.getElementById('fPharmacy').value = a.pharmacy_id || '';
+  document.getElementById('fStatut').value = a.statut_jeu || 'Non Joué';
+  Modal.open('agentModal');
+}
+
+async function saveAgent() {
+  const id = document.getElementById('editId').value;
+  const body = {
+    nom: document.getElementById('fNom').value.trim(),
+    email: document.getElementById('fEmail').value.trim() || null,
+    telephone: document.getElementById('fTel').value.trim() || null,
+    pharmacy_id: document.getElementById('fPharmacy').value || null,
+    statut_jeu: document.getElementById('fStatut').value
+  };
+  if (!body.nom) { Toast.warning('Le nom est requis'); return; }
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  try {
+    if (id) { await API.put(`/api/agents/${id}`, body); Toast.success('Agent mis à jour'); }
+    else { await API.post('/api/agents', body); Toast.success('Agent créé'); }
+    Modal.close('agentModal');
+    allData = await API.get('/api/agents') || [];
+    filterTable();
+  } catch (err) { Toast.error(err.message); }
+  finally { btn.disabled = false; btn.textContent = '💾 Enregistrer'; }
+}
+
+async function deleteItem(id) {
+  confirmAction('Supprimer cet agent ?', async () => {
+    try {
+      await API.delete(`/api/agents/${id}`);
+      Toast.success('Agent supprimé');
+      allData = await API.get('/api/agents') || [];
+      filterTable();
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+loadPage();
+</script>
+</body>
+</html>

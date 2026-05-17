@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+  <style>
+    body {
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(135deg,#FAFAFA 0%,rgba(162,210,223,0.18) 50%,rgba(227,122,90,0.08) 100%);
+      padding:20px; overflow:hidden;
+    }
+    .deco { position:fixed; border-radius:50%; pointer-events:none; }
+    .deco1 { width:500px;height:500px;top:-15%;right:-10%;background:radial-gradient(circle,rgba(162,210,223,0.18),transparent 70%); }
+    .deco2 { width:400px;height:400px;bottom:-10%;left:-10%;background:radial-gradient(circle,rgba(227,122,90,0.10),transparent 70%); }
+    .login-box { width:100%;max-width:440px;position:relative;z-index:1;animation:fadeIn 0.5s ease; }
+    .login-brand { text-align:center;margin-bottom:28px; }
+    .login-logo {
+      width:72px;height:72px;
+      background:linear-gradient(135deg,var(--primary),var(--primary-light));
+      border-radius:20px; display:flex;align-items:center;justify-content:center;
+      font-size:2rem; margin:0 auto 14px;
+      box-shadow:0 8px 32px rgba(227,122,90,0.35);
+      animation:glowPulse 3s ease-in-out infinite;
+    }
+    .login-brand h1 { font-size:1.55rem;color:var(--text);margin-bottom:4px; }
+    .login-brand p  { font-size:0.82rem;color:var(--text-muted); }
+    .login-card {
+      background:var(--surface); border-radius:var(--radius-lg); padding:36px;
+      box-shadow:var(--shadow-lg); border:1px solid rgba(255,255,255,0.8);
+    }
+    .tab-bar {
+      display:flex; gap:4px; background:var(--bg);
+      border-radius:var(--radius-sm); padding:4px; margin-bottom:24px;
+    }
+    .tab-btn {
+      flex:1; padding:9px; border:none; border-radius:8px;
+      font-family:'Poppins',sans-serif; font-size:0.85rem; font-weight:600;
+      cursor:pointer; background:none; color:var(--text-muted); transition:var(--transition);
+    }
+    .tab-btn.active { background:var(--surface); color:var(--primary); box-shadow:var(--shadow-sm); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; animation:fadeIn 0.3s ease; }
+    .alert {
+      border-radius:var(--radius-sm); padding:12px 16px;
+      font-size:0.85rem; margin-bottom:16px; display:none; gap:10px; align-items:flex-start;
+    }
+    .alert.show { display:flex; animation:fadeIn 0.3s ease; }
+    .alert-error   { background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.2);color:var(--error); }
+    .alert-success { background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2);color:var(--success); }
+    .alert-info    { background:rgba(162,210,223,0.15);border:1px solid rgba(162,210,223,0.4);color:var(--secondary-dark); }
+    .input-wrap { position:relative; }
+    .input-wrap .ico { position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:1rem;pointer-events:none; }
+    .input-wrap input { padding-left:40px; }
+    .eye-btn { position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:2px; }
+    .btn-full { width:100%;padding:13px;font-size:0.95rem;border-radius:var(--radius);margin-top:4px; }
+    .login-foot { margin-top:18px;text-align:center;font-size:0.75rem;color:var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="deco deco1"></div>
+<div class="deco deco2"></div>
+
+<div class="login-box">
+  <div class="login-brand">
+    <div class="login-logo">💧</div>
+    <h1>Eau Thermale Avène</h1>
+    <p>Plateforme de Formation Interactive</p>
+  </div>
+
+  <div class="login-card">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('login')">🔑 Connexion</button>
+      <button class="tab-btn"        onclick="switchTab('register')">➕ Créer un compte</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="tab-panel active" id="tabLogin">
+      <div class="alert alert-error" id="loginErr"><span>⚠️</span><span id="loginErrTxt"></span></div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <div class="input-wrap">
+          <span class="ico">✉️</span>
+          <input type="email" id="loginEmail" class="form-control" placeholder="votre@email.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <div class="input-wrap">
+          <span class="ico">🔒</span>
+          <input type="password" id="loginPwd" class="form-control" placeholder="••••••••" autocomplete="current-password">
+          <button class="eye-btn" type="button" onclick="toggleEye('loginPwd',this)">👁️</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="loginBtn" onclick="doLogin()">
+        <span id="loginBtnTxt">Se connecter</span>
+      </button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="tab-panel" id="tabRegister">
+      <div class="alert alert-info show">
+        <span>ℹ️</span>
+        <span>Le <strong>premier compte</strong> créé sera automatiquement <strong>Administrateur</strong>. Les suivants seront Délégués (modifiable ensuite).</span>
+      </div>
+      <div class="alert alert-error"   id="regErr"><span>⚠️</span><span id="regErrTxt"></span></div>
+      <div class="alert alert-success" id="regOk"><span>✅</span><span id="regOkTxt"></span></div>
+      <div class="form-group">
+        <label class="form-label">Nom complet *</label>
+        <div class="input-wrap">
+          <span class="ico">👤</span>
+          <input type="text" id="regNom" class="form-control" placeholder="Prénom Nom">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <div class="input-wrap">
+          <span class="ico">✉️</span>
+          <input type="email" id="regEmail" class="form-control" placeholder="votre@email.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe * (min. 6 caractères)</label>
+        <div class="input-wrap">
+          <span class="ico">🔒</span>
+          <input type="password" id="regPwd" class="form-control" placeholder="••••••••" autocomplete="new-password">
+          <button class="eye-btn" type="button" onclick="toggleEye('regPwd',this)">👁️</button>
+        </div>
+      </div>
+      <button class="btn btn-secondary btn-full" id="regBtn" onclick="doRegister()">
+        <span id="regBtnTxt">Créer mon compte</span>
+      </button>
+    </div>
+
+    <div class="login-foot">Eau Thermale Avène © 2024 — Plateforme Agents</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL  = 'https://iobmqmgmqezolivkmtxq.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvYm1xbWdtcWV6b2xpdmttdHhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMTUyNDMsImV4cCI6MjA5NDU5MTI0M30.sZHqhrkOB_ZHUaJNkvEUwoGD3GFP94CoMWxzWGA3gAw';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Tabs
+function switchTab(t) {
+  ['login','register'].forEach(id => {
+    document.getElementById('tab'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('active', id===t);
+  });
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', (i===0&&t==='login')||(i===1&&t==='register')));
+}
+
+function toggleEye(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? '👁️' : '🙈';
+}
+
+function showErr(errId, txtId, msg)  { const e=document.getElementById(errId); e.classList.add('show'); document.getElementById(txtId).textContent=msg; }
+function showOk(okId, txtId, msg)    { const e=document.getElementById(okId);  e.classList.add('show'); document.getElementById(txtId).textContent=msg; }
+function hideAll(...ids)             { ids.forEach(id => document.getElementById(id)?.classList.remove('show')); }
+
+// ── Traduction erreurs Supabase ───────────────────────────────
+function t(msg) {
+  if (!msg) return 'Erreur inconnue';
+  if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) return 'Email ou mot de passe incorrect.';
+  if (msg.includes('Email not confirmed'))  return 'Confirmez votre email avant de vous connecter.';
+  if (msg.includes('already registered') || msg.includes('User already registered')) return 'Cet email est déjà utilisé.';
+  if (msg.includes('Password'))             return 'Mot de passe trop court (minimum 6 caractères).';
+  if (msg.includes('Unable to validate'))   return 'Session expirée, réessayez.';
+  if (msg.includes('signup_disabled'))      return 'Les inscriptions sont désactivées sur ce projet Supabase.';
+  return msg;
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+async function doLogin() {
+  hideAll('loginErr');
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPwd').value;
+  if (!email || !pwd) { showErr('loginErr','loginErrTxt','Remplissez tous les champs.'); return; }
+
+  const btn = document.getElementById('loginBtn');
+  const txt = document.getElementById('loginBtnTxt');
+  btn.disabled=true; txt.textContent='Connexion…';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+    if (error) throw error;
+
+    // S'assurer que le profil existe
+    await ensureProfile(data.session.access_token, data.user);
+
+    txt.textContent='✅ Connecté !';
+    setTimeout(() => window.location.href='/dashboard.html', 400);
+  } catch(err) {
+    showErr('loginErr','loginErrTxt', t(err.message));
+    btn.disabled=false; txt.textContent='Se connecter';
+  }
+}
+
+// ── REGISTER ──────────────────────────────────────────────────
+async function doRegister() {
+  hideAll('regErr','regOk');
+  const nom   = document.getElementById('regNom').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pwd   = document.getElementById('regPwd').value;
+
+  if (!nom||!email||!pwd) { showErr('regErr','regErrTxt','Tous les champs sont requis.'); return; }
+  if (pwd.length<6)        { showErr('regErr','regErrTxt','Mot de passe trop court (min 6 caractères).'); return; }
+
+  const btn=document.getElementById('regBtn');
+  const txt=document.getElementById('regBtnTxt');
+  btn.disabled=true; txt.textContent='Création…';
+
+  try {
+    const { data, error } = await sb.auth.signUp({ email, password: pwd });
+    if (error) throw error;
+
+    if (!data.user) throw new Error('Aucun utilisateur retourné par Supabase.');
+
+    // Si on a une session (email confirm désactivé) → créer profil immédiatement
+    if (data.session) {
+      const role = await getRole(data.session.access_token);
+      await createProfile(data.session.access_token, data.user, nom, role);
+      showOk('regOk','regOkTxt',`Compte créé (rôle: ${role}). Redirection…`);
+      setTimeout(() => window.location.href='/dashboard.html', 1200);
+    } else {
+      // Email confirm activé → demander de vérifier l'email
+      showOk('regOk','regOkTxt','Compte créé ! Vérifiez votre email pour confirmer, puis connectez-vous.');
+      document.getElementById('loginEmail').value = email;
+      setTimeout(() => switchTab('login'), 2000);
+    }
+
+    btn.disabled=false; txt.textContent='Créer mon compte';
+  } catch(err) {
+    showErr('regErr','regErrTxt', t(err.message));
+    btn.disabled=false; txt.textContent='Créer mon compte';
+  }
+}
+
+// ── Helpers profil ────────────────────────────────────────────
+async function ensureProfile(token, user) {
+  try {
+    const r = await fetch('/api/auth/profile', { headers: { 'Authorization':`Bearer ${token}` } });
+    if (r.ok) return; // profil existe déjà
+    // Créer profil manquant
+    const role = await getRole(token);
+    await createProfile(token, user, user.email, role);
+  } catch(e) { console.warn('ensureProfile:', e.message); }
+}
+
+async function getRole(token) {
+  // Si aucun profil dans la table → premier utilisateur = admin
+  try {
+    const r = await fetch('/api/users', { headers: { 'Authorization':`Bearer ${token}` } });
+    if (!r.ok) return 'admin'; // pas encore admin → sera le premier
+    const list = await r.json();
+    return (!list || list.length === 0) ? 'admin' : 'delegue';
+  } catch { return 'delegue'; }
+}
+
+async function createProfile(token, user, nom, role) {
+  await fetch('/api/auth/setup-profile', {
+    method:'POST',
+    headers:{ 'Authorization':`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ nom, role })
+  });
+}
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  document.getElementById('tabLogin').classList.contains('active') ? doLogin() : doRegister();
+});
+
+// Déjà connecté ?
+(async () => {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data?.session) window.location.href='/dashboard.html';
+  } catch {}
+})();
+</script>
+</body>
+</html>
+EOF
+echo "✅ login.html v3 OK"
+Sortie

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pharmacies — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <div class="brand-icon">💧</div>
+        <div class="brand-text">
+          <span class="brand-name">Eau Thermale Avène</span>
+          <span class="brand-sub">Formation Platform</span>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="userName">Chargement...</div>
+          <div class="user-role" id="userRole">—</div>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()" title="Déconnexion">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">Pharmacies</div>
+        <div class="page-subtitle">Gestion des points de vente</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Nouvelle Pharmacie</button>
+    </header>
+
+    <div class="page-body">
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap" style="flex:2">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Rechercher une pharmacie…" id="searchInput" oninput="filterTable()">
+            </div>
+            <select class="form-control" id="tourneeFilter" onchange="filterTable()" style="max-width:200px;">
+              <option value="">Toutes les tournées</option>
+            </select>
+            <select class="form-control" id="typeFilter" onchange="filterTable()" style="max-width:160px;">
+              <option value="">Tous types</option>
+              <option value="pharmacie">Pharmacie</option>
+              <option value="para">Para</option>
+              <option value="fournisseur">Fournisseur</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <div id="tableContainer">
+            <div class="loader"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="pharmacieModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Nouvelle Pharmacie</h3>
+      <button class="modal-close" onclick="Modal.close('pharmacieModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div class="form-group">
+        <label class="form-label">Tournée *</label>
+        <select id="fTournee" class="form-control">
+          <option value="">Sélectionner une tournée</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom *</label>
+        <input type="text" id="fNom" class="form-control" placeholder="Nom de la pharmacie">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type *</label>
+          <select id="fType" class="form-control">
+            <option value="pharmacie">Pharmacie</option>
+            <option value="para">Para</option>
+            <option value="fournisseur">Fournisseur</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone</label>
+          <input type="tel" id="fTel" class="form-control" placeholder="+216 00 000 000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Latitude</label>
+          <input type="number" id="fLat" class="form-control" placeholder="36.8065" step="any">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Longitude</label>
+          <input type="number" id="fLng" class="form-control" placeholder="10.1815" step="any">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="fVisitee" style="width:18px;height:18px;cursor:pointer;">
+          Marquer comme visitée
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('pharmacieModal')">Annuler</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="savePharmacies()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let allData = [], tournees = [];
+
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  tournees = await API.get('/api/tournees') || [];
+  populateTourneeSelects();
+  await loadPharmacies();
+}
+
+function populateTourneeSelects() {
+  const opts = tournees.map(t => `<option value="${t.id}">${t.region}</option>`).join('');
+  document.getElementById('tourneeFilter').innerHTML = '<option value="">Toutes les tournées</option>' + opts;
+  document.getElementById('fTournee').innerHTML = '<option value="">Sélectionner une tournée</option>' + opts;
+}
+
+async function loadPharmacies() {
+  try {
+    allData = await API.get('/api/pharmacies') || [];
+    renderTable(allData);
+  } catch (err) { Toast.error('Erreur: ' + err.message); }
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">🏥</div><h4>Aucune pharmacie</h4><p>Ajoutez votre première pharmacie</p></div>`;
+    return;
+  }
+  const typeIcon = { pharmacie: '💊', para: '🧴', fournisseur: '📦' };
+  document.getElementById('tableContainer').innerHTML = `
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Nom</th><th>Type</th><th>Tournée</th><th>Téléphone</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${data.map(p => {
+            const tournee = tournees.find(t => t.id === p.tournee_id);
+            return `
+              <tr>
+                <td><strong>${p.nom}</strong></td>
+                <td><span class="badge badge-info">${typeIcon[p.type] || ''} ${p.type || '—'}</span></td>
+                <td>${tournee ? tournee.region : '<span class="text-muted">—</span>'}</td>
+                <td>${p.telephone || '<span class="text-muted">—</span>'}</td>
+                <td>
+                  <span class="badge ${p.est_visitee ? 'badge-success' : 'badge-muted'}">
+                    ${p.est_visitee ? '✅ Visitée' : '⏳ En attente'}
+                  </span>
+                </td>
+                <td>
+                  <div class="actions-bar">
+                    <a href="/agents.html?pharmacy_id=${p.id}" class="btn btn-sm btn-outline">👤 Agents</a>
+                    <button class="btn btn-sm btn-outline" onclick="editItem(${p.id})">✏️</button>
+                    <button class="btn btn-sm btn-danger" data-admin-only onclick="deleteItem(${p.id})">🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (!Auth.isAdmin()) document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const tid = document.getElementById('tourneeFilter').value;
+  const type = document.getElementById('typeFilter').value;
+  renderTable(allData.filter(p => {
+    return (!q || p.nom.toLowerCase().includes(q)) &&
+           (!tid || String(p.tournee_id) === tid) &&
+           (!type || p.type === type);
+  }));
+}
+
+function openCreateModal() {
+  document.getElementById('editId').value = '';
+  document.getElementById('modalTitle').textContent = 'Nouvelle Pharmacie';
+  ['fNom','fTel','fLat','fLng'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('fType').value = 'pharmacie';
+  document.getElementById('fTournee').value = '';
+  document.getElementById('fVisitee').checked = false;
+  Modal.open('pharmacieModal');
+}
+
+function editItem(id) {
+  const p = allData.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('editId').value = p.id;
+  document.getElementById('modalTitle').textContent = 'Modifier la pharmacie';
+  document.getElementById('fNom').value = p.nom;
+  document.getElementById('fType').value = p.type || 'pharmacie';
+  document.getElementById('fTournee').value = p.tournee_id || '';
+  document.getElementById('fTel').value = p.telephone || '';
+  document.getElementById('fLat').value = p.latitude || '';
+  document.getElementById('fLng').value = p.longitude || '';
+  document.getElementById('fVisitee').checked = p.est_visitee;
+  Modal.open('pharmacieModal');
+}
+
+async function savePharmacies() {
+  const id = document.getElementById('editId').value;
+  const body = {
+    nom: document.getElementById('fNom').value.trim(),
+    type: document.getElementById('fType').value,
+    tournee_id: document.getElementById('fTournee').value || null,
+    telephone: document.getElementById('fTel').value.trim() || null,
+    latitude: parseFloat(document.getElementById('fLat').value) || null,
+    longitude: parseFloat(document.getElementById('fLng').value) || null,
+    est_visitee: document.getElementById('fVisitee').checked
+  };
+  if (!body.nom) { Toast.warning('Le nom est requis'); return; }
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  try {
+    if (id) { await API.put(`/api/pharmacies/${id}`, body); Toast.success('Pharmacie mise à jour'); }
+    else { await API.post('/api/pharmacies', body); Toast.success('Pharmacie créée'); }
+    Modal.close('pharmacieModal');
+    await loadPharmacies();
+  } catch (err) { Toast.error(err.message); }
+  finally { btn.disabled = false; btn.textContent = '💾 Enregistrer'; }
+}
+
+async function deleteItem(id) {
+  confirmAction('Supprimer cette pharmacie et tous ses agents ?', async () => {
+    try {
+      await API.delete(`/api/pharmacies/${id}`);
+      Toast.success('Pharmacie supprimée');
+      await loadPharmacies();
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+loadPage();
+</script>
+</body>
+</html>

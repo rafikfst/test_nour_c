@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Utilisateurs — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-logo"><div class="brand-icon">💧</div><div class="brand-text"><span class="brand-name">Eau Thermale Avène</span><span class="brand-sub">Formation Platform</span></div></div></div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer"><div class="user-card"><div class="user-avatar" id="userAvatar">A</div><div class="user-info"><div class="user-name" id="userName">Chargement...</div><div class="user-role" id="userRole">—</div></div><button class="btn-logout" onclick="handleLogout()">🚪</button></div></div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">👥 Gestion des Utilisateurs</div>
+        <div class="page-subtitle">Création et administration des comptes</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Nouvel Utilisateur</button>
+    </header>
+
+    <div class="page-body">
+      <!-- Admin warning -->
+      <div style="background:rgba(243,156,18,0.1);border:1px solid rgba(243,156,18,0.3);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:20px;color:var(--warning);font-size:0.875rem;display:flex;align-items:center;gap:10px;">
+        <span>🔒</span>
+        <span><strong>Section Administrateur</strong> — Cette page permet la création de comptes Supabase Auth. Les mots de passe sont définis par l'admin à la création.</span>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Comptes utilisateurs</h3>
+          <div class="search-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Rechercher…" id="searchInput" oninput="filterTable()">
+            </div>
+            <select class="form-control" id="roleFilter" onchange="filterTable()" style="max-width:150px;">
+              <option value="">Tous les rôles</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="delegue">Délégué</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div id="tableContainer"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Nouvel Utilisateur</h3>
+      <button class="modal-close" onclick="Modal.close('userModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div id="createOnlyFields">
+        <div class="form-group">
+          <label class="form-label">Adresse Email *</label>
+          <input type="email" id="fEmail" class="form-control" placeholder="utilisateur@avene.com" autocomplete="off">
+        </div>
+        <div class="form-group" id="passwordField">
+          <label class="form-label">Mot de passe *</label>
+          <input type="password" id="fPassword" class="form-control" placeholder="Minimum 6 caractères" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom complet *</label>
+        <input type="text" id="fNom" class="form-control" placeholder="Prénom Nom">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rôle *</label>
+        <select id="fRole" class="form-control">
+          <option value="delegue">Délégué médical</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Administrateur</option>
+        </select>
+      </div>
+      <div id="roleInfo" style="padding:12px;border-radius:var(--radius-sm);margin-top:8px;font-size:0.8rem;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('userModal')">Annuler</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveUser()">💾 Créer l'utilisateur</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Changer le mot de passe</h3>
+      <button class="modal-close" onclick="Modal.close('passwordModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted mb-4">Définir un nouveau mot de passe pour <strong id="resetUserName"></strong></p>
+      <input type="hidden" id="resetUserId">
+      <div class="form-group">
+        <label class="form-label">Nouveau mot de passe</label>
+        <input type="password" id="newPassword" class="form-control" placeholder="Minimum 6 caractères">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('passwordModal')">Annuler</button>
+      <button class="btn btn-primary" onclick="savePassword()">🔑 Changer</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let allUsers = [];
+
+const roleConfig = {
+  admin:   { icon: '👑', color: 'var(--primary)', bg: 'rgba(227,122,90,0.1)', label: 'Administrateur — Accès total à toutes les fonctionnalités' },
+  manager: { icon: '📊', color: 'var(--secondary-dark)', bg: 'rgba(162,210,223,0.2)', label: 'Manager — Consultation des rapports et gestion des tournées' },
+  delegue: { icon: '👤', color: 'var(--success)', bg: 'rgba(39,174,96,0.1)', label: 'Délégué — Utilisation du jeu et consultation de base' }
+};
+
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  if (!Auth.isAdmin()) {
+    document.querySelector('.page-body').innerHTML = `
+      <div class="card"><div class="result-card" style="padding:40px;">
+        <span style="font-size:3rem;display:block;margin-bottom:16px;">🔒</span>
+        <h3>Accès Réservé</h3>
+        <p class="text-muted mt-4">Cette section est réservée aux administrateurs.</p>
+        <a href="/dashboard.html" class="btn btn-primary mt-6">← Retour au tableau de bord</a>
+      </div></div>`;
+    return;
+  }
+  await loadUsers();
+  document.getElementById('fRole').addEventListener('change', updateRoleInfo);
+  updateRoleInfo();
+}
+
+async function loadUsers() {
+  try {
+    allUsers = await API.get('/api/users') || [];
+    renderTable(allUsers);
+  } catch (err) {
+    Toast.error('Erreur: ' + err.message);
+  }
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">👥</div><h4>Aucun utilisateur</h4></div>`;
+    return;
+  }
+  document.getElementById('tableContainer').innerHTML = `
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Créé le</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${data.map(u => {
+            const cfg = roleConfig[u.role] || roleConfig.delegue;
+            const isSelf = u.id === Auth.user?.id;
+            return `
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:36px;height:36px;border-radius:50%;background:${cfg.bg};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">${cfg.icon}</div>
+                    <div>
+                      <div style="font-weight:600;">${u.nom} ${isSelf ? '<span class="badge badge-info" style="font-size:0.65rem;">Vous</span>' : ''}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style="color:var(--text-muted);">${u.email}</td>
+                <td><span class="badge" style="background:${cfg.bg};color:${cfg.color};">${cfg.icon} ${u.role}</span></td>
+                <td class="text-muted">${formatDate(u.created_at)}</td>
+                <td>
+                  <div class="actions-bar">
+                    <button class="btn btn-sm btn-outline" onclick="editUser('${u.id}')">✏️ Modifier</button>
+                    <button class="btn btn-sm btn-outline" onclick="openResetPassword('${u.id}', '${u.nom}')">🔑</button>
+                    ${!isSelf ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">🗑️</button>` : ''}
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const role = document.getElementById('roleFilter').value;
+  renderTable(allUsers.filter(u =>
+    (!q || u.nom.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) &&
+    (!role || u.role === role)
+  ));
+}
+
+function updateRoleInfo() {
+  const role = document.getElementById('fRole').value;
+  const cfg = roleConfig[role];
+  if (cfg) {
+    document.getElementById('roleInfo').innerHTML = `
+      <div style="background:${cfg.bg};border-radius:var(--radius-sm);padding:10px 14px;color:${cfg.color};">
+        ${cfg.icon} <strong>${role}</strong> — ${cfg.label}
+      </div>
+    `;
+  }
+}
+
+function openCreateModal() {
+  document.getElementById('editId').value = '';
+  document.getElementById('modalTitle').textContent = 'Nouvel Utilisateur';
+  document.getElementById('fEmail').value = '';
+  document.getElementById('fPassword').value = '';
+  document.getElementById('fNom').value = '';
+  document.getElementById('fRole').value = 'delegue';
+  document.getElementById('createOnlyFields').style.display = 'block';
+  document.getElementById('passwordField').style.display = 'block';
+  document.getElementById('saveBtn').textContent = '💾 Créer l\'utilisateur';
+  updateRoleInfo();
+  Modal.open('userModal');
+}
+
+function editUser(id) {
+  const u = allUsers.find(x => x.id === id);
+  if (!u) return;
+  document.getElementById('editId').value = u.id;
+  document.getElementById('modalTitle').textContent = 'Modifier l\'utilisateur';
+  document.getElementById('fNom').value = u.nom;
+  document.getElementById('fRole').value = u.role;
+  document.getElementById('createOnlyFields').style.display = 'none';
+  document.getElementById('saveBtn').textContent = '💾 Mettre à jour';
+  updateRoleInfo();
+  Modal.open('userModal');
+}
+
+async function saveUser() {
+  const id = document.getElementById('editId').value;
+  const btn = document.getElementById('saveBtn');
+
+  if (id) {
+    // Edit
+    const body = {
+      nom: document.getElementById('fNom').value.trim(),
+      role: document.getElementById('fRole').value,
+    };
+    if (!body.nom) { Toast.warning('Le nom est requis'); return; }
+    btn.disabled = true; btn.textContent = 'Enregistrement…';
+    try {
+      await API.put(`/api/users/${id}`, body);
+      Toast.success('Utilisateur mis à jour');
+      Modal.close('userModal');
+      await loadUsers();
+    } catch (err) { Toast.error(err.message); }
+    finally { btn.disabled = false; btn.textContent = '💾 Mettre à jour'; }
+  } else {
+    // Create
+    const body = {
+      email: document.getElementById('fEmail').value.trim(),
+      password: document.getElementById('fPassword').value,
+      nom: document.getElementById('fNom').value.trim(),
+      role: document.getElementById('fRole').value,
+    };
+    if (!body.email || !body.password || !body.nom) { Toast.warning('Tous les champs sont requis'); return; }
+    if (body.password.length < 6) { Toast.warning('Le mot de passe doit contenir au moins 6 caractères'); return; }
+    btn.disabled = true; btn.textContent = 'Création en cours…';
+    try {
+      await API.post('/api/users', body);
+      Toast.success(`Utilisateur ${body.nom} créé avec succès`);
+      Modal.close('userModal');
+      await loadUsers();
+    } catch (err) { Toast.error(err.message); }
+    finally { btn.disabled = false; btn.textContent = '💾 Créer l\'utilisateur'; }
+  }
+}
+
+function openResetPassword(id, nom) {
+  document.getElementById('resetUserId').value = id;
+  document.getElementById('resetUserName').textContent = nom;
+  document.getElementById('newPassword').value = '';
+  Modal.open('passwordModal');
+}
+
+async function savePassword() {
+  const id = document.getElementById('resetUserId').value;
+  const pwd = document.getElementById('newPassword').value;
+  if (!pwd || pwd.length < 6) { Toast.warning('Mot de passe trop court (min 6 caractères)'); return; }
+  try {
+    await API.put(`/api/users/${id}`, { password: pwd });
+    Toast.success('Mot de passe mis à jour');
+    Modal.close('passwordModal');
+  } catch (err) { Toast.error(err.message); }
+}
+
+async function deleteUser(id) {
+  confirmAction('Supprimer définitivement cet utilisateur ?', async () => {
+    try {
+      await API.delete(`/api/users/${id}`);
+      Toast.success('Utilisateur supprimé');
+      await loadUsers();
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+loadPage();
+</script>
+</body>
+</html>

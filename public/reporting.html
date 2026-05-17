@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rapports — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    .reporting-table-wrap {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 600px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+    .reporting-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      font-size: 0.82rem;
+      min-width: 1100px;
+    }
+    .reporting-table thead {
+      position: sticky; top: 0; z-index: 10;
+    }
+    .reporting-table th {
+      background: var(--text);
+      color: white;
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .reporting-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+      max-width: 200px;
+    }
+    .reporting-table td.question-cell {
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: help;
+    }
+    .reporting-table tr:hover td { background: rgba(227,122,90,0.04); }
+    .reporting-table tr:last-child td { border-bottom: none; }
+    .reporting-table tr:nth-child(even) td { background: rgba(44,62,80,0.02); }
+
+    .export-bar {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+
+    .summary-chips {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .summary-chip {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-logo"><div class="brand-icon">💧</div><div class="brand-text"><span class="brand-name">Eau Thermale Avène</span><span class="brand-sub">Formation Platform</span></div></div></div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer"><div class="user-card"><div class="user-avatar" id="userAvatar">A</div><div class="user-info"><div class="user-name" id="userName">Chargement...</div><div class="user-role" id="userRole">—</div></div><button class="btn-logout" onclick="handleLogout()">🚪</button></div></div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">📊 Rapports & Bilan</div>
+        <div class="page-subtitle">Historique des sessions de jeu</div>
+      </div>
+      <div class="export-bar">
+        <button class="btn btn-success" onclick="exportExcel()">📥 Exporter Excel</button>
+        <button class="btn btn-outline" onclick="loadBilans()">🔄 Actualiser</button>
+      </div>
+    </header>
+
+    <div class="page-body">
+      <!-- Summary chips -->
+      <div class="summary-chips" id="summaryChips">
+        <div class="summary-chip skeleton" style="width:120px;height:36px;"></div>
+        <div class="summary-chip skeleton" style="width:140px;height:36px;"></div>
+        <div class="summary-chip skeleton" style="width:100px;height:36px;"></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="search-bar">
+            <div class="search-input-wrap" style="flex:2">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Rechercher par agent ou pharmacie…" id="searchInput" oninput="filterTable()">
+            </div>
+            <select class="form-control" id="cadeauFilter" onchange="filterTable()" style="max-width:180px;">
+              <option value="">Tous cadeaux</option>
+              <option value="Aucun">Sans cadeau</option>
+              <option value="Type 1">Type 1</option>
+              <option value="Type 2">Type 2</option>
+              <option value="Type 3">Type 3</option>
+              <option value="Super Lot">Super Lot</option>
+            </select>
+            <input type="date" class="form-control" id="dateFilter" onchange="filterTable()" style="max-width:180px;">
+            <button class="btn btn-outline btn-sm" onclick="clearFilters()">✕ Effacer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <div id="tableContainer"><div class="loader"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+let allBilans = [], tourneeRegion = '';
+
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  // Get region for export filename
+  const tournees = await API.get('/api/tournees') || [];
+  if (tournees.length) tourneeRegion = tournees[0].region;
+  await loadBilans();
+}
+
+async function loadBilans() {
+  try {
+    allBilans = await API.get('/api/reporting') || [];
+    renderSummary(allBilans);
+    renderTable(allBilans);
+  } catch (err) {
+    Toast.error('Erreur: ' + err.message);
+  }
+}
+
+function renderSummary(data) {
+  const total = data.length;
+  const withGift = data.filter(b => b.cadeau_assigne).length;
+  const superlot = data.filter(b => b.cadeau_description === 'Super Lot').length;
+  const winRate = total ? Math.round((withGift / total) * 100) : 0;
+
+  document.getElementById('summaryChips').innerHTML = `
+    <div class="summary-chip" style="background:rgba(44,62,80,0.08);color:var(--text);">📋 ${total} session${total > 1 ? 's' : ''}</div>
+    <div class="summary-chip" style="background:rgba(39,174,96,0.12);color:var(--success);">🏆 ${withGift} gagnant${withGift > 1 ? 's' : ''}</div>
+    <div class="summary-chip" style="background:rgba(231,76,60,0.12);color:var(--error);">💎 ${superlot} super lot</div>
+    <div class="summary-chip" style="background:rgba(227,122,90,0.12);color:var(--primary);">📈 ${winRate}% taux de réussite</div>
+  `;
+}
+
+function renderTable(data) {
+  if (!data.length) {
+    document.getElementById('tableContainer').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">📊</div><h4>Aucun bilan</h4><p>Les bilans apparaîtront après les sessions de jeu</p></div>`;
+    return;
+  }
+
+  document.getElementById('tableContainer').innerHTML = `
+    <div class="reporting-table-wrap">
+      <table class="reporting-table" id="bilanTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Pharmacie</th>
+            <th>Agent</th>
+            <th>Q1 — Énoncé</th>
+            <th>R1 — Réponse</th>
+            <th>Q2 — Énoncé</th>
+            <th>R2 — Réponse</th>
+            <th>Q3 — Énoncé</th>
+            <th>R3 — Réponse</th>
+            <th>Q4 — Énoncé</th>
+            <th>R4 — Réponse</th>
+            <th>Cadeau Assigné</th>
+            <th>Cadeau</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bilanTbody">
+          ${data.map((b, idx) => `
+            <tr>
+              <td><strong>${idx + 1}</strong></td>
+              <td style="white-space:nowrap;">${formatDateTime(b.created_at)}</td>
+              <td><strong>${b.nom_pharmacie || '—'}</strong></td>
+              <td>${b.nom_agent || '—'}</td>
+              <td class="question-cell" title="${b.q1 || ''}">${b.q1 || '<span class="text-muted">—</span>'}</td>
+              <td>${renderResult(b.r1)}</td>
+              <td class="question-cell" title="${b.q2 || ''}">${b.q2 || '<span class="text-muted">—</span>'}</td>
+              <td>${renderResult(b.r2)}</td>
+              <td class="question-cell" title="${b.q3 || ''}">${b.q3 || '<span class="text-muted">—</span>'}</td>
+              <td>${renderResult(b.r3)}</td>
+              <td class="question-cell" title="${b.q4 || ''}">${b.q4 || '<span class="text-muted">—</span>'}</td>
+              <td>${renderResult(b.r4)}</td>
+              <td style="text-align:center;">${b.cadeau_assigne ? '<span class="badge badge-success">✅</span>' : '<span class="badge badge-muted">❌</span>'}</td>
+              <td>
+                <span class="badge ${b.cadeau_description === 'Aucun' ? 'badge-muted' : b.cadeau_description === 'Super Lot' ? 'badge-error' : 'badge-success'}">
+                  ${b.cadeau_description || 'Aucun'}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-danger" data-admin-only onclick="deleteBilan(${b.id})">🗑️</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  if (!Auth.isAdmin()) document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
+}
+
+function renderResult(val) {
+  if (!val) return '<span class="text-muted">—</span>';
+  if (val.startsWith('✅')) return `<span class="badge badge-success" style="font-size:0.72rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${val}">✅ Correct</span>`;
+  if (val.startsWith('❌')) return `<span class="badge badge-error" style="font-size:0.72rem;" title="${val}">❌ Incorrect</span>`;
+  return `<span class="text-muted">${val}</span>`;
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const cadeau = document.getElementById('cadeauFilter').value;
+  const date = document.getElementById('dateFilter').value;
+
+  const filtered = allBilans.filter(b => {
+    const matchQ = !q || (b.nom_agent || '').toLowerCase().includes(q) || (b.nom_pharmacie || '').toLowerCase().includes(q);
+    const matchC = !cadeau || b.cadeau_description === cadeau;
+    const matchD = !date || b.created_at?.startsWith(date);
+    return matchQ && matchC && matchD;
+  });
+  renderSummary(filtered);
+  renderTable(filtered);
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('cadeauFilter').value = '';
+  document.getElementById('dateFilter').value = '';
+  renderSummary(allBilans);
+  renderTable(allBilans);
+}
+
+async function deleteBilan(id) {
+  confirmAction('Supprimer ce bilan ?', async () => {
+    try {
+      await API.delete(`/api/bilans/${id}`);
+      Toast.success('Bilan supprimé');
+      await loadBilans();
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+// ── Excel Export ──────────────────────────────────────────────
+function exportExcel() {
+  if (!allBilans.length) { Toast.warning('Aucune donnée à exporter'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Build data array
+  const headers = [
+    '#', 'Date', 'Pharmacie', 'Agent',
+    'Q1 — Énoncé', 'R1 — Réponse',
+    'Q2 — Énoncé', 'R2 — Réponse',
+    'Q3 — Énoncé', 'R3 — Réponse',
+    'Q4 — Énoncé', 'R4 — Réponse',
+    'Cadeau Assigné', 'Cadeau'
+  ];
+
+  const rows = allBilans.map((b, i) => [
+    i + 1,
+    formatDateTime(b.created_at),
+    b.nom_pharmacie || '—',
+    b.nom_agent || '—',
+    b.q1 || '—', b.r1 || '—',
+    b.q2 || '—', b.r2 || '—',
+    b.q3 || '—', b.r3 || '—',
+    b.q4 || '—', b.r4 || '—',
+    b.cadeau_assigne ? 'OUI' : 'NON',
+    b.cadeau_description || 'Aucun'
+  ]);
+
+  const wsData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 4 }, { wch: 18 }, { wch: 22 }, { wch: 20 },
+    { wch: 30 }, { wch: 25 },
+    { wch: 30 }, { wch: 25 },
+    { wch: 30 }, { wch: 25 },
+    { wch: 30 }, { wch: 25 },
+    { wch: 14 }, { wch: 14 }
+  ];
+
+  // Style header row
+  const headerRange = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+    const cell = XLSX.utils.encode_cell({ r: 0, c: C });
+    if (!ws[cell]) continue;
+    ws[cell].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+      fill: { fgColor: { rgb: '2C3E50' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        bottom: { style: 'medium', color: { rgb: 'E37A5A' } }
+      }
+    };
+  }
+
+  // Style data rows
+  for (let R = 1; R <= rows.length; R++) {
+    for (let C = headerRange.s.c; C <= headerRange.e.c; C++) {
+      const cell = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[cell]) ws[cell] = { v: '' };
+      ws[cell].s = {
+        alignment: { vertical: 'center', wrapText: true },
+        fill: { fgColor: { rgb: R % 2 === 0 ? 'F9F9F9' : 'FFFFFF' } }
+      };
+    }
+    // Color cadeau column
+    const cadeauCell = XLSX.utils.encode_cell({ r: R, c: 13 });
+    if (ws[cadeauCell]) {
+      const val = ws[cadeauCell].v;
+      ws[cadeauCell].s = {
+        ...ws[cadeauCell].s,
+        font: { bold: true, color: { rgb: val === 'Aucun' ? '7F8C8D' : val === 'Super Lot' ? 'E74C3C' : '27AE60' } }
+      };
+    }
+  }
+
+  // Stats sheet
+  const stats = [
+    ['RAPPORT AVÈNE — ' + new Date().toLocaleDateString('fr-FR')],
+    [],
+    ['Total sessions', allBilans.length],
+    ['Sessions gagnantes', allBilans.filter(b => b.cadeau_assigne).length],
+    ['Super Lots distribués', allBilans.filter(b => b.cadeau_description === 'Super Lot').length],
+    ['Taux de réussite', allBilans.length ? Math.round((allBilans.filter(b => b.cadeau_assigne).length / allBilans.length) * 100) + '%' : '0%'],
+    [],
+    ['Répartition des cadeaux'],
+    ['Type 1', allBilans.filter(b => b.cadeau_description === 'Type 1').length],
+    ['Type 2', allBilans.filter(b => b.cadeau_description === 'Type 2').length],
+    ['Type 3', allBilans.filter(b => b.cadeau_description === 'Type 3').length],
+    ['Super Lot', allBilans.filter(b => b.cadeau_description === 'Super Lot').length],
+  ];
+
+  const wsStats = XLSX.utils.aoa_to_sheet(stats);
+  wsStats['!cols'] = [{ wch: 28 }, { wch: 16 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Bilans Sessions');
+  XLSX.utils.book_append_sheet(wb, wsStats, 'Statistiques');
+
+  const region = (tourneeRegion || 'avene').replace(/\s+/g, '_').toLowerCase();
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `bilan_avene_${region}_${date}.xlsx`);
+  Toast.success('Export Excel téléchargé !');
+}
+
+loadPage();
+</script>
+</body>
+</html>

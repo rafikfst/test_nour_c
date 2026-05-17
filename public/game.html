@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu — Avène</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+  <style>
+    .game-setup { max-width: 600px; margin: 0 auto; }
+    .game-arena { max-width: 800px; margin: 0 auto; }
+
+    /* Level indicator */
+    .level-bar {
+      display: flex; gap: 8px; margin-bottom: 28px;
+    }
+    .level-dot {
+      flex: 1; height: 8px; border-radius: 4px;
+      background: var(--border); transition: var(--transition);
+    }
+    .level-dot.active   { background: var(--primary); }
+    .level-dot.complete { background: var(--success); }
+
+    /* Question card */
+    .question-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .question-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+    }
+
+    .difficulty-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem; font-weight: 700;
+      margin-bottom: 20px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+
+    .question-text {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 28px;
+      font-family: 'Playfair Display', serif;
+    }
+
+    /* Answer zone */
+    .answer-zone {
+      min-height: 80px;
+      border: 2px dashed var(--secondary);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: rgba(162,210,223,0.05);
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .answer-zone:empty::after {
+      content: '👆 Cliquez sur les mots pour les placer ici dans l\'ordre';
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      position: absolute;
+      left: 16px; top: 50%;
+      transform: translateY(-50%);
+    }
+    .answer-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(227,122,90,0.05);
+    }
+
+    /* Word pool */
+    .word-pool {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 20px;
+      background: var(--bg);
+      border-radius: var(--radius);
+      min-height: 80px;
+      border: 1px solid var(--border);
+    }
+
+    /* Gift choice modal content */
+    .gift-choices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .gift-btn {
+      padding: 20px 16px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      text-align: center;
+      transition: var(--transition);
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+    }
+    .gift-btn:hover { border-color: var(--primary); background: rgba(227,122,90,0.05); transform: translateY(-2px); }
+    .gift-btn.primary-gift {
+      background: linear-gradient(135deg, rgba(227,122,90,0.1), rgba(162,210,223,0.1));
+      border-color: var(--primary);
+    }
+    .gift-btn.continue-btn {
+      animation: buttonPulse 2.2s ease-in-out infinite;
+    }
+    .gift-btn .gift-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+    .gift-btn .gift-label { font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 4px; }
+    .gift-btn .stock-warning { font-size: 0.75rem; color: var(--warning); margin-top: 6px; display: block; }
+
+    /* Result screens */
+    .result-card {
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .result-icon { font-size: 4rem; margin-bottom: 16px; display: block; animation: starPop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+    .result-title { font-size: 1.8rem; margin-bottom: 12px; }
+    .result-subtitle { color: var(--text-muted); margin-bottom: 28px; }
+
+    /* Validation bar */
+    .validate-bar {
+      display: flex; gap: 12px; align-items: center; margin-top: 20px;
+    }
+    .words-count {
+      font-size: 0.8rem; color: var(--text-muted); flex: 1;
+    }
+
+    /* Agent/Pharmacy selector */
+    .selector-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .selector-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    /* Bubble overlay */
+    .bubble-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 9000; overflow: hidden; display: none; }
+    .bubble-overlay.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-logo"><div class="brand-icon">💧</div><div class="brand-text"><span class="brand-name">Eau Thermale Avène</span><span class="brand-sub">Formation Platform</span></div></div></div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer"><div class="user-card"><div class="user-avatar" id="userAvatar">A</div><div class="user-info"><div class="user-name" id="userName">Chargement...</div><div class="user-role" id="userRole">—</div></div><button class="btn-logout" onclick="handleLogout()">🚪</button></div></div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div>
+        <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title">🎮 Arène de Jeu</div>
+        <div class="page-subtitle" id="gameSubtitle">Configuration de la session</div>
+      </div>
+      <button class="btn btn-outline" onclick="resetGame()">🔄 Réinitialiser</button>
+    </header>
+
+    <div class="page-body">
+      <!-- STEP 1: Setup -->
+      <div id="setupScreen" class="game-setup">
+        <div class="selector-card">
+          <h3>🏥 Sélectionner la Pharmacie & l'Agent</h3>
+          <div class="form-group">
+            <label class="form-label">Tournée</label>
+            <select id="selTournee" class="form-control" onchange="onTourneeChange()">
+              <option value="">Choisir une tournée…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pharmacie</label>
+            <select id="selPharmacie" class="form-control" onchange="onPharmacieChange()" disabled>
+              <option value="">Choisir une pharmacie…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Agent</label>
+            <select id="selAgent" class="form-control" onchange="onAgentChange()" disabled>
+              <option value="">Choisir un agent…</option>
+            </select>
+          </div>
+          <div id="agentStatutAlert" style="display:none;" class="mb-4"></div>
+        </div>
+
+        <!-- Stock preview -->
+        <div id="stockPreview" style="display:none;" class="selector-card">
+          <h3>📦 Stock disponible</h3>
+          <div id="stockDetails"></div>
+        </div>
+
+        <button class="btn btn-primary btn-lg w-full btn-pulse" id="startGameBtn" onclick="startGame()" disabled>
+          🚀 Lancer le Jeu
+        </button>
+      </div>
+
+      <!-- STEP 2: Game Arena -->
+      <div id="gameScreen" style="display:none;" class="game-arena">
+        <!-- Level indicator -->
+        <div class="level-bar">
+          <div class="level-dot" id="lvl1dot"></div>
+          <div class="level-dot" id="lvl2dot"></div>
+          <div class="level-dot" id="lvl3dot"></div>
+          <div class="level-dot" id="lvl4dot"></div>
+        </div>
+
+        <!-- Question card -->
+        <div class="question-card" id="questionCard">
+          <div id="difficultyBadge" class="difficulty-badge"></div>
+          <div class="question-text" id="questionText"></div>
+
+          <p class="text-sm text-muted mb-4" style="font-weight:600;">📝 Votre réponse (dans l'ordre) :</p>
+          <div class="answer-zone" id="answerZone"></div>
+
+          <p class="text-sm text-muted mb-4" style="font-weight:600;">🎯 Mots disponibles :</p>
+          <div class="word-pool" id="wordPool"></div>
+
+          <div class="validate-bar">
+            <span class="words-count" id="wordsCount">0 mot(s) placé(s)</span>
+            <button class="btn btn-outline" onclick="clearAnswer()">↩️ Effacer</button>
+            <button class="btn btn-primary btn-lg" id="validateBtn" onclick="validateAnswer()">
+              ✅ Valider
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Result screen -->
+      <div id="resultScreen" style="display:none;" class="game-arena">
+        <div class="card">
+          <div class="result-card" id="resultContent"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Gift Choice Modal -->
+<div class="modal-overlay" id="giftModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="giftModalTitle">🎉 Bravo ! Choisissez votre récompense</h3>
+      <button class="modal-close" onclick="Modal.close('giftModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted" id="giftModalDesc">Vous avez réussi ce niveau ! Souhaitez-vous prendre votre cadeau ou tenter le niveau suivant ?</p>
+      <div class="gift-choices" id="giftChoices"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bubble overlay -->
+<div class="bubble-overlay" id="bubbleOverlay"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/game.js"></script>
+<script>
+async function loadPage() {
+  await Auth.init();
+  renderLayout();
+  await GameEngine.init();
+}
+loadPage();
+</script>
+</body>
+</html>
